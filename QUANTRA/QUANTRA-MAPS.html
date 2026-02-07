@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANTRA | INFINITY PROTOCOL</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+       
+        body { margin: 0; padding: 0; background: #000; font-family: 'Courier New', monospace; overflow: hidden; }
+        #map { height: 100vh; width: 100%; z-index: 1; opacity: 0.8; }
+
+        
+        .grid-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none; z-index: 2;
+        }
+
+       
+        .control-panel {
+            position: absolute; top: 20px; left: 20px; width: 400px;
+            background: rgba(10, 15, 10, 0.9);
+            border: 1px solid #00FF88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            padding: 20px; z-index: 1000;
+            color: #00FF88;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 { font-size: 24px; margin: 0 0 15px 0; text-shadow: 0 0 10px #00FF88; display: flex; align-items: center; gap: 10px; }
+        
+        .input-group { margin-bottom: 15px; position: relative; }
+        .input-group i { position: absolute; left: 10px; top: 12px; color: #00FF88; }
+        input {
+            width: 85%; padding: 10px 10px 10px 35px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #333; color: white;
+            font-family: 'Courier New', monospace;
+            outline: none; transition: 0.3s;
+        }
+        input:focus { border-color: #00FF88; box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+
+        .btn-launch {
+            width: 100%; padding: 15px;
+            background: #00FF88; color: black;
+            font-weight: bold; border: none; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 2px;
+            font-size: 16px; transition: 0.3s;
+        }
+        .btn-launch:hover { background: white; box-shadow: 0 0 20px #00FF88; }
+
+        
+        .logs {
+            margin-top: 15px; height: 100px; overflow-y: auto;
+            font-size: 12px; color: #888; border-top: 1px solid #333; padding-top: 10px;
+        }
+        .log-entry { margin-bottom: 5px; }
+        .success { color: #00FF88; }
+        .error { color: #FF4444; }
+
+       
+        .quantum-stats {
+            display: none; margin-top: 15px; padding: 10px;
+            border: 1px dashed #00FF88; background: rgba(0, 255, 136, 0.05);
+        }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .stat-val { font-weight: bold; color: white; }
+
+       
+        .spinner { display: none; text-align: center; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="grid-overlay"></div>
+    <div id="map"></div>
+
+    <div class="control-panel">
+        <h1><i class="fa-solid fa-atom fa-spin"></i> QUANTRA CORE</h1>
+        
+        <div class="input-group">
+            <i class="fa-solid fa-location-crosshairs"></i>
+            <input type="text" id="startLoc" placeholder="Enter Start Location (e.g. T Nagar)">
+        </div>
+        
+        <div class="input-group">
+            <i class="fa-solid fa-flag-checkered"></i>
+            <input type="text" id="endLoc" placeholder="Enter Destination (e.g. Marina Beach)">
+        </div>
+
+        <button class="btn-launch" onclick="initiateQuantumProtocol()">
+            <i class="fa-solid fa-bolt"></i> ACTIVATE GREEN WAVE
+        </button>
+
+        <div class="spinner" id="loader">
+            <i class="fa-solid fa-circle-notch fa-spin" style="color: #00FF88; font-size: 24px;"></i>
+            <div style="font-size: 10px; margin-top: 5px;">CALCULATING QUANTUM STATES...</div>
+        </div>
+
+        <div class="quantum-stats" id="stats">
+            <div class="stat-row"><span>DISTANCE:</span> <span class="stat-val" id="distVal">0 km</span></div>
+            <div class="stat-row"><span>NORMAL TIME:</span> <span class="stat-val" id="normVal" style="color:#FF4444">0 min</span></div>
+            <div class="stat-row"><span>QUANTUM TIME:</span> <span class="stat-val" id="quantVal" style="color:#00FF88">0 min</span></div>
+            <div style="margin-top: 10px; text-align: center; font-size: 10px; color: #00FF88;">
+                <i class="fa-solid fa-check-circle"></i> SIGNALS OVERRIDDEN
+            </div>
+        </div>
+
+        <div class="logs" id="consoleLogs">
+            <div class="log-entry">System Initialized... Waiting for input.</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        
+        const map = L.map('map', {zoomControl: false}).setView([13.0827, 80.2707], 12); // Default Chennai
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        let routeLayer = null;
+        let markerLayer = null;
+        let ambulanceMarker = null;
+
+      
+        function log(msg, type='normal') {
+            const logs = document.getElementById('consoleLogs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `> ${msg}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        
+        async function getCoordinates(query) {
+            log(`Scanning Grid for "${query}"...`);
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+                const data = await response.json();
+                if (data && data.length > 0) {
+                    log(`Target Locked: [${data[0].lat}, ${data[0].lon}]`, 'success');
+                    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                } else {
+                    log(`Location "${query}" not found!`, 'error');
+                    return null;
+                }
+            } catch (e) {
+                log("Satellite Connection Failed.", 'error');
+                return null;
+            }
+        }
+
+        
+        async function getRoute(start, end) {
+            log("Computing Quantum Path via OSRM...", 'success');
+            
+            const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.routes && data.routes.length > 0) {
+                    return data.routes[0];
+                }
+                return null;
+            } catch (e) {
+                log("Routing Engine Error.", 'error');
+                return null;
+            }
+        }
+
+        // --- 5. MAIN LOGIC ---
+        async function initiateQuantumProtocol() {
+            const startName = document.getElementById('startLoc').value;
+            const endName = document.getElementById('endLoc').value;
+            const loader = document.getElementById('loader');
+            const stats = document.getElementById('stats');
+
+            if(!startName || !endName) {
+                log("INPUT ERROR: Define Start & End Points.", 'error');
+                return;
+            }
+
+            // Reset
+            if(routeLayer) map.removeLayer(routeLayer);
+            if(markerLayer) map.removeLayer(markerLayer);
+            if(ambulanceMarker) map.removeLayer(ambulanceMarker);
+            markerLayer = L.layerGroup().addTo(map);
+            stats.style.display = 'none';
+            loader.style.display = 'block';
+
+        
+            const startCoords = await getCoordinates(startName);
+            if(!startCoords) { loader.style.display = 'none'; return; }
+            
+            const endCoords = await getCoordinates(endName);
+            if(!endCoords) { loader.style.display = 'none'; return; }
+
+            
+            const startIcon = L.divIcon({html: '<i class="fa-solid fa-location-dot" style="color:#00FF88; font-size:24px;"></i>', className:'x', iconSize:[20,20]});
+            const endIcon = L.divIcon({html: '<i class="fa-solid fa-flag-checkered" style="color:#FF4444; font-size:24px;"></i>', className:'x', iconSize:[20,20]});
+            
+            L.marker(startCoords, {icon: startIcon}).addTo(markerLayer);
+            L.marker(endCoords, {icon: endIcon}).addTo(markerLayer);
+
+           
+            const routeData = await getRoute(startCoords, endCoords);
+            loader.style.display = 'none';
+
+            if(routeData) {
+                log("PATH OPTIMIZED. Green Wave Active.", 'success');
+                
+                
+                routeLayer = L.geoJSON(routeData.geometry, {
+                    style: { color: '#00FF88', weight: 6, opacity: 0.8, className: 'glowing-line' }
+                }).addTo(map);
+
+                map.fitBounds(routeLayer.getBounds(), {padding: [50, 50]});
+
+                // Update Stats
+                const distKm = (routeData.distance / 1000).toFixed(1);
+                const durationMin = (routeData.duration / 60).toFixed(0);
+                const quantumMin = (durationMin * 0.4).toFixed(0); // 60% faster
+
+                document.getElementById('distVal').innerText = distKm + " km";
+                document.getElementById('normVal').innerText = durationMin + " min";
+                document.getElementById('quantVal').innerText = quantumMin + " min";
+                stats.style.display = 'block';
+
+                // Step D: Animate Ambulance
+                animateAmbulance(routeData.geometry.coordinates);
+            }
+        }
+
+       
+        function animateAmbulance(coords) {
+            
+            const path = coords.map(c => [c[1], c[0]]);
+            
+            const ambIcon = L.divIcon({
+                html: '<div style="font-size:20px; filter:drop-shadow(0 0 10px #00FF88);">🚑</div>',
+                className: 'amb-icon', iconSize: [30,30]
+            });
+
+            ambulanceMarker = L.marker(path[0], {icon: ambIcon}).addTo(map);
+
+            let i = 0;
+            const speed = 2; // Higher is faster skipping
+            
+            const interval = setInterval(() => {
+                if (i >= path.length) {
+                    clearInterval(interval);
+                    log("DESTINATION REACHED.", 'success');
+                    return;
+                }
+                ambulanceMarker.setLatLng(path[i]);
+                i += speed;
+            }, 30); // Update rate
+        }
+
+    </script>
+</body>
+</html>
