@@ -48,7 +48,7 @@ Core System Modules
 - Minimizes overall delay for emergency vehicles.
 
 Demo Video
-Project demonstration video link:  
+Project demonstration video link: https://drive.google.com/file/d/1AYLEKzIlLHA0kszxN4pxhIzOpNnn8p4G/view?usp=drivesdk
 
 How to Run the Simulation
 Prerequisites
